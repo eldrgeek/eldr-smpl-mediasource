@@ -3,7 +3,7 @@ import ReactDOM from "react-dom";
 
 import App from "./App";
 import mediaProcessor from "./mediaProcessor";
-import fileEmitter from "./fileEmitter";
+// import fileEmitter from "./fileEmitter";
 // fileEmitter()
 mediaProcessor();
 const rootElement = document.getElementById("root");
