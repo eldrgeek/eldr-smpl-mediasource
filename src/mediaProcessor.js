@@ -14,16 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { getMediaSource } from "./MyMediaSource";
+import getMediaRecorder from "./getMediaRecorder";
 import fileEmitter from "./fileEmitter";
+function defer() {
+  var deferred = {};
+  var promise = new Promise(function(resolve, reject) {
+    deferred.resolve = resolve;
+    deferred.reject = reject;
+  });
+  deferred.promise = promise;
+  return deferred;
+}
 // fileEmitter()
 // This code adapted from Eric Bidelman's demo at
 // http://html5-demos.appspot.com/static/media-source.html
 export default function main() {
   var video = document.querySelector("#video1");
   var video2 = document.querySelector("#video2");
+  var video3 = document.querySelector("#video3");
 
   const mediaSource1 = getMediaSource();
+  const mediaSource2 = getMediaSource();
   const mediaSource = getMediaSource();
+  const mediaSource3 = getMediaSource();
+
+  let stream2;
   console.log(mediaSource, mediaSource1);
   // if (!window.MediaSource) {
   //   alert("The MediaSource API is not available on this platform");
@@ -31,46 +46,44 @@ export default function main() {
 
   // var mediaSource = new MediaSource();
 
-  video.src = window.URL.createObjectURL(mediaSource);
-  video2.src = window.URL.createObjectURL(mediaSource1);
+  const stream1 = (video.src = window.URL.createObjectURL(mediaSource));
 
-  getMediaContent(mediaSource, mediaSource1);
   let sourceBuffer, sourceBuffer1;
-  let ondataended, ondataready;
-  function getMediaContent(mediaSource, mediaSource1) {
-    mediaSource1.addEventListener("sourceopen", function() {
-      sourceBuffer1 = mediaSource1.addSourceBuffer(
+  let fileBuffers = [];
+  ///Build stream based on buffers from read1
+  const read2 = () => {
+    // console.log("read2 called", fileBuffers.length);
+    stream2 = video2.src = window.URL.createObjectURL(mediaSource2);
+    mediaSource2.addEventListener("sourceopen", async function() {
+      let sourceBuffer2 = mediaSource2.addSourceBuffer(
         'video/webm; codecs="vorbis,vp8"'
       ); //
-      console.log("Got source bugger");
-      ondataready = async (e, deferred) => {
-        // let array/ = new Uint8Array(e.target.result);
-        try {
-          sourceBuffer.appendBuffer(new Uint8Array(e.target.result));
-        } catch (e) {
-          console.log("append error", e.message);
-        }
-
-        if (video2.paused) {
-          video2.play(); // Start playing after 1st chunk is appended.
-        }
-        setTimeout(() => {
-          console.log("resolved");
-          if (deferred) deferred.resolve();
-        }, 2000);
-      };
-      ondataended = data => {
-        // sourceBuffer.addEventListener("updateend", function() {
-        //   if (
-        //     !sourceBuffer.updating &&
-        //     mediaSource.readyState === "open"
-        //   ) {
-        //     mediaSource.endOfStream();
-        //   }
-        // });
-      };
-      // fileEmitter(null, ondataready, ondataended);
+      // console.log("read2 source open", fileBuffers.length);
+      for (let i = 0; i < fileBuffers.length; i++) {
+        let deferred = new defer();
+        sourceBuffer2.appendBuffer(new Uint8Array(fileBuffers[i]));
+        setTimeout(() => deferred.resolve(), 1000);
+        await deferred.promise;
+      }
     });
+  };
+  //build stream based on recorder from stream1
+  const read3 = () => {
+    video3.src = window.URL.createObjectURL(mediaSource3);
+    const recorder = getMediaRecorder(stream1);
+    console.log("read3 called", fileBuffers.length);
+    mediaSource3.addEventListener("sourceopen", async function() {
+      sourceBuffer3 = mediaSource1.addSourceBuffer(
+        'video/webm; codecs="vorbis,vp8"'
+      ); //
+      console.log("read1 source open", fileBuffers.length);
+      recorder.start(100);
+      recorder.ondataavailable = e => {
+        sourceBuffer3.appendBuffer(new Uint8Array(e.data));
+      };
+    });
+  };
+  const read1 = () => {
     mediaSource.addEventListener(
       "sourceopen",
       function() {
@@ -100,8 +113,8 @@ export default function main() {
             // is done (onload is fired).
             reader.onload = e => appendToBuffer(e);
             function appendToBuffer(e) {
-              sourceBuffer1.appendBuffer(new Uint8Array(e.target.result));
-              ondataready(e);
+              fileBuffers.push(e.target.result);
+              sourceBuffer.appendBuffer(new Uint8Array(e.target.result));
               // sourceBuffer.appendBuffer(new Uint8Array(e.target.result));
 
               if (i === NUM_CHUNKS - 1) {
@@ -117,7 +130,7 @@ export default function main() {
                 if (video.paused) {
                   video.play(); // Start playing after 1st chunk is appended.
                 }
-                setTimeout(() => readChunk_(++i), 3000);
+                readChunk_(++i);
               }
             }
 
@@ -132,7 +145,10 @@ export default function main() {
       },
       false
     );
-  }
+  };
+  read1();
+  read3();
+  setTimeout(read2, 2000);
 
   mediaSource.addEventListener(
     "sourceended",
