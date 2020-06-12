@@ -29,65 +29,39 @@ function defer() {
 // This code adapted from Eric Bidelman's demo at
 // http://html5-demos.appspot.com/static/media-source.html
 export default function main() {
-  var video = document.querySelector("#video1");
+  var video1 = document.querySelector("#video1");
   var video2 = document.querySelector("#video2");
   var video3 = document.querySelector("#video3");
 
   const mediaSource1 = getMediaSource();
   const mediaSource2 = getMediaSource();
-  const mediaSource = getMediaSource();
   const mediaSource3 = getMediaSource();
 
-  let stream2;
-  console.log(mediaSource, mediaSource1);
   // if (!window.MediaSource) {
   //   alert("The MediaSource API is not available on this platform");
   // }
 
   // var mediaSource = new MediaSource();
 
-  const stream1 = (video.src = window.URL.createObjectURL(mediaSource));
-
-  let sourceBuffer, sourceBuffer1;
+  //save the file buffers created by read1 for use in read2
   let fileBuffers = [];
   ///Build stream based on buffers from read1
-  const read2 = () => {
-    // console.log("read2 called", fileBuffers.length);
-    stream2 = video2.src = window.URL.createObjectURL(mediaSource2);
-    mediaSource2.addEventListener("sourceopen", async function() {
-      let sourceBuffer2 = mediaSource2.addSourceBuffer(
-        'video/webm; codecs="vorbis,vp8"'
-      ); //
-      // console.log("read2 source open", fileBuffers.length);
-      for (let i = 0; i < fileBuffers.length; i++) {
-        let deferred = new defer();
-        sourceBuffer2.appendBuffer(new Uint8Array(fileBuffers[i]));
-        setTimeout(() => deferred.resolve(), 1000);
-        await deferred.promise;
+  let streams = []; //save the streams
+  const closeStream = (sourceBuffer, mediaSource) => {
+    sourceBuffer.addEventListener("updateend", function() {
+      if (!sourceBuffer.updating && mediaSource.readyState === "open") {
+        mediaSource.endOfStream();
       }
     });
   };
-  //build stream based on recorder from stream1
-  const read3 = () => {
-    video3.src = window.URL.createObjectURL(mediaSource3);
-    const recorder = getMediaRecorder(stream1);
-    console.log("read3 called", fileBuffers.length);
-    mediaSource3.addEventListener("sourceopen", async function() {
-      sourceBuffer3 = mediaSource1.addSourceBuffer(
-        'video/webm; codecs="vorbis,vp8"'
-      ); //
-      console.log("read1 source open", fileBuffers.length);
-      recorder.start(100);
-      recorder.ondataavailable = e => {
-        sourceBuffer3.appendBuffer(new Uint8Array(e.data));
-      };
-    });
-  };
   const read1 = () => {
-    mediaSource.addEventListener(
+    const stream1 = window.URL.createObjectURL(mediaSource1);
+    video1.src = stream1; //if this line is commented out the stream does not open
+    streams[1] = stream1;
+    mediaSource1.addEventListener(
       "sourceopen",
       function() {
-        sourceBuffer = mediaSource.addSourceBuffer(
+        const sourceBuffer = mediaSource1.addSourceBuffer(
           'video/webm; codecs="vorbis,vp8"'
         );
         var FILE = "https://simpl.info/mse/test.webm";
@@ -111,28 +85,20 @@ export default function main() {
             // Reads aren't guaranteed to finish in the same order they're started in,
             // so we need to read + append the next chunk after the previous reader
             // is done (onload is fired).
-            reader.onload = e => appendToBuffer(e);
-            function appendToBuffer(e) {
+            reader.onload = function appendToBuffer(e) {
               fileBuffers.push(e.target.result);
               sourceBuffer.appendBuffer(new Uint8Array(e.target.result));
               // sourceBuffer.appendBuffer(new Uint8Array(e.target.result));
 
               if (i === NUM_CHUNKS - 1) {
-                sourceBuffer.addEventListener("updateend", function() {
-                  if (
-                    !sourceBuffer.updating &&
-                    mediaSource.readyState === "open"
-                  ) {
-                    mediaSource.endOfStream();
-                  }
-                });
+                closeStream(sourceBuffer, mediaSource1);
               } else {
-                if (video.paused) {
-                  video.play(); // Start playing after 1st chunk is appended.
+                if (video1.paused) {
+                  video1.play(); // Start playing after 1st chunk is appended.
                 }
                 readChunk_(++i);
               }
-            }
+            };
 
             var startByte = chunkSize * i;
             var chunk = file.slice(startByte, startByte + chunkSize);
@@ -146,11 +112,48 @@ export default function main() {
       false
     );
   };
-  read1();
-  read3();
-  setTimeout(read2, 2000);
+  const read2 = () => {
+    // console.log("read2 called", fileBuffers.length);
+    const videoX = document.createElement("video");
+    let stream2 = (video2.src = window.URL.createObjectURL(mediaSource2));
+    videoX.src = stream2;
+    mediaSource2.addEventListener("sourceopen", async function() {
+      let sourceBuffer2 = mediaSource2.addSourceBuffer(
+        'video/webm; codecs="vorbis,vp8"'
+      ); //
+      // console.log("read2 source open", fileBuffers.length);
+      let deferred = null;
+      sourceBuffer2.onupdateend = () => deferred.resolve();
+      for (let i = 0; i < fileBuffers.length; i++) {
+        deferred = new defer();
+        sourceBuffer2.appendBuffer(new Uint8Array(fileBuffers[i]));
+        await deferred.promise;
+      }
+      mediaSource2.endOfStream();
+    });
+  };
+  //build stream based on recorder from stream1
+  const read3 = () => {
+    video3.src = window.URL.createObjectURL(mediaSource3);
+    const recorder = getMediaRecorder(video1.captureStream());
+    console.log("read3 called", fileBuffers.length);
+    mediaSource3.addEventListener("sourceopen", async function() {
+      let sourceBuffer3 = mediaSource3.addSourceBuffer(
+        'video/webm; codecs="vorbis,vp8"'
+      ); //
+      console.log("read1 source open", fileBuffers.length);
+      recorder.start(100);
+      recorder.ondataavailable = e => {
+        sourceBuffer3.appendBuffer(new Uint8Array(e.data));
+      };
+    });
+  };
 
-  mediaSource.addEventListener(
+  read1();
+  setTimeout(read2, 300);
+  setTimeout(read3, 1000);
+
+  mediaSource1.addEventListener(
     "sourceended",
     function() {
       log("MediaSource readyState: " + this.readyState);
