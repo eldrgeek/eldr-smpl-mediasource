@@ -146,18 +146,9 @@ export default function main() {
         // 'video/webm; codecs="vorbis,vp8"'
         "video/webm;codecs=vp9,opus"
       ); //
-      let count = 0;
       let deferred = null;
       //called when the filereader has laoded
-      const onFileReaderLoaded = e => {
-        sourceBuffer3.appendBuffer(new Uint8Array(e.target.result));
-      };
       //Called when the next chnuk is added to the source buffer
-      sourceBuffer3.onupdateend = () => {
-        deferred.resolve();
-      };
-      // fillBuffer(sourceBuffer3, mediaSource3)
-      recorder.start(200);
       recorder.onstop = async () => {
         mediaSource3.onsourceopen = () => {};
         await deferred.promise;
@@ -166,17 +157,16 @@ export default function main() {
       };
       recorder.ondataavailable = async e => {
         deferred = defer();
-        try {
-          // let buffer = await e.data.arrayBuffer();
-          const reader = new FileReader();
-          reader.onload = onFileReaderLoaded;
-          reader.readAsArrayBuffer(e.data);
-        } catch (e) {
-          console.log("Counld not append", e.toString());
-        }
+        let buffer = await e.data.arrayBuffer();
+        sourceBuffer3.appendBuffer(new Uint8Array(buffer));
         await deferred.promise;
         // if(block <= N_BLOCKS) recorder.resume()
       };
+      sourceBuffer3.onupdateend = () => {
+        deferred.resolve();
+      };
+      // fillBuffer(sourceBuffer3, mediaSource3)
+      recorder.start(200);
     };
   };
 
