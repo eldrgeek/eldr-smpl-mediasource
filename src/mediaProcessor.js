@@ -140,7 +140,8 @@ export default function main() {
   const read3 = () => {
     video3.src = window.URL.createObjectURL(mediaSource3);
     const recorder = getMediaRecorder(video1.captureStream());
-    mediaSource3.addEventListener("sourceopen", async function() {
+    mediaSource3.onsourceopen = async function() {
+      console.log("Added source buffer", mediaSource3.sourceBuffers.length);
       let sourceBuffer3 = mediaSource3.addSourceBuffer(
         // 'video/webm; codecs="vorbis,vp8"'
         "video/webm;codecs=vp9,opus"
@@ -149,46 +150,34 @@ export default function main() {
       let deferred = null;
       //called when the filereader has laoded
       const onFileReaderLoaded = e => {
-        console.log("reader loaded");
-        // deferred.resolve();
-        try {
-          sourceBuffer3.appendBuffer(new Uint8Array(e.target.result));
-          //  deferred.resolve()
-        } catch (e) {
-          console.log("onloaded", e.toString());
-        }
+        sourceBuffer3.appendBuffer(new Uint8Array(e.target.result));
       };
       //Called when the next chnuk is added to the source buffer
       sourceBuffer3.onupdateend = () => {
-        // deferred.resolve();
-        console.log("update end", count++);
-        if (video3.paused) {
-          video3.play(); // Start playing after 1st chunk is appended.
-        }
         deferred.resolve();
       };
       // fillBuffer(sourceBuffer3, mediaSource3)
-      let block = 0;
-      recorder.start(100);
-      console.log("start reader");
+      recorder.start(200);
+      recorder.onstop = async () => {
+        mediaSource3.onsourceopen = () => {};
+        await deferred.promise;
+        console.log("recorder stop");
+        mediaSource3.endOfStream();
+      };
       recorder.ondataavailable = async e => {
-        // console.log("data available")
-
         deferred = defer();
         try {
           // let buffer = await e.data.arrayBuffer();
           const reader = new FileReader();
           reader.onload = onFileReaderLoaded;
-          console.log("blobtype", e.data.type);
           reader.readAsArrayBuffer(e.data);
-          console.log("Appended");
         } catch (e) {
           console.log("Counld not append", e.toString());
         }
         await deferred.promise;
         // if(block <= N_BLOCKS) recorder.resume()
       };
-    });
+    };
   };
 
   read1();
