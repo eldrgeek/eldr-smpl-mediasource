@@ -54,6 +54,16 @@ export default function main() {
       }
     });
   };
+  const fillBuffer = async (sourceBuffer2, mediaSource2) => {
+    let deferred = null;
+    sourceBuffer2.onupdateend = () => deferred.resolve();
+    for (let i = 0; i < fileBuffers.length; i++) {
+      deferred = new defer();
+      sourceBuffer2.appendBuffer(new Uint8Array(fileBuffers[i]));
+      await deferred.promise;
+    }
+    mediaSource2.endOfStream();
+  };
   const read1 = () => {
     const stream1 = window.URL.createObjectURL(mediaSource1);
     video1.src = stream1; //if this line is commented out the stream does not open
@@ -122,36 +132,68 @@ export default function main() {
         'video/webm; codecs="vorbis,vp8"'
       ); //
       // console.log("read2 source open", fileBuffers.length);
-      let deferred = null;
-      sourceBuffer2.onupdateend = () => deferred.resolve();
-      for (let i = 0; i < fileBuffers.length; i++) {
-        deferred = new defer();
-        sourceBuffer2.appendBuffer(new Uint8Array(fileBuffers[i]));
-        await deferred.promise;
-      }
-      mediaSource2.endOfStream();
+
+      fillBuffer(sourceBuffer2, mediaSource2);
     });
   };
   //build stream based on recorder from stream1
   const read3 = () => {
     video3.src = window.URL.createObjectURL(mediaSource3);
     const recorder = getMediaRecorder(video1.captureStream());
-    console.log("read3 called", fileBuffers.length);
     mediaSource3.addEventListener("sourceopen", async function() {
       let sourceBuffer3 = mediaSource3.addSourceBuffer(
-        'video/webm; codecs="vorbis,vp8"'
+        // 'video/webm; codecs="vorbis,vp8"'
+        "video/webm;codecs=vp9,opus"
       ); //
-      console.log("read1 source open", fileBuffers.length);
+      let count = 0;
+      let deferred = null;
+      //called when the filereader has laoded
+      const onFileReaderLoaded = e => {
+        console.log("reader loaded");
+        // deferred.resolve();
+        try {
+          sourceBuffer3.appendBuffer(new Uint8Array(e.target.result));
+          //  deferred.resolve()
+        } catch (e) {
+          console.log("onloaded", e.toString());
+        }
+      };
+      //Called when the next chnuk is added to the source buffer
+      sourceBuffer3.onupdateend = () => {
+        // deferred.resolve();
+        console.log("update end", count++);
+        if (video3.paused) {
+          video3.play(); // Start playing after 1st chunk is appended.
+        }
+        deferred.resolve();
+      };
+      // fillBuffer(sourceBuffer3, mediaSource3)
+      let block = 0;
       recorder.start(100);
-      recorder.ondataavailable = e => {
-        sourceBuffer3.appendBuffer(new Uint8Array(e.data));
+      console.log("start reader");
+      recorder.ondataavailable = async e => {
+        // console.log("data available")
+
+        deferred = defer();
+        try {
+          // let buffer = await e.data.arrayBuffer();
+          const reader = new FileReader();
+          reader.onload = onFileReaderLoaded;
+          console.log("blobtype", e.data.type);
+          reader.readAsArrayBuffer(e.data);
+          console.log("Appended");
+        } catch (e) {
+          console.log("Counld not append", e.toString());
+        }
+        await deferred.promise;
+        // if(block <= N_BLOCKS) recorder.resume()
       };
     });
   };
 
   read1();
   setTimeout(read2, 300);
-  setTimeout(read3, 1000);
+  setTimeout(read3, 200);
 
   mediaSource1.addEventListener(
     "sourceended",
