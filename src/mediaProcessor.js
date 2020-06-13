@@ -13,9 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { getMediaSource } from "./MyMediaSource";
 import getMediaRecorder from "./getMediaRecorder";
-import fileEmitter from "./fileEmitter";
+import delayStream from "./delayStream";
 function defer() {
   var deferred = {};
   var promise = new Promise(function(resolve, reject) {
@@ -32,10 +31,11 @@ export default function main() {
   var video1 = document.querySelector("#video1");
   var video2 = document.querySelector("#video2");
   var video3 = document.querySelector("#video3");
+  var video4 = document.querySelector("#video4");
 
-  const mediaSource1 = getMediaSource();
-  const mediaSource2 = getMediaSource();
-  const mediaSource3 = getMediaSource();
+  const mediaSource1 = new MediaSource();
+  const mediaSource2 = new MediaSource();
+  const mediaSource3 = new MediaSource();
 
   // if (!window.MediaSource) {
   //   alert("The MediaSource API is not available on this platform");
@@ -137,9 +137,9 @@ export default function main() {
     });
   };
   //build stream based on recorder from stream1
-  const read3 = () => {
+  const read3 = stream => {
     video3.src = window.URL.createObjectURL(mediaSource3);
-    const recorder = getMediaRecorder(video1.captureStream());
+    const recorder = getMediaRecorder(stream);
     mediaSource3.onsourceopen = async function() {
       console.log("Added source buffer", mediaSource3.sourceBuffers.length);
       let sourceBuffer3 = mediaSource3.addSourceBuffer(
@@ -166,14 +166,21 @@ export default function main() {
         deferred.resolve();
       };
       // fillBuffer(sourceBuffer3, mediaSource3)
-      recorder.start(200);
+      if (stream.getTracks().length !== 0) {
+        recorder.start(200);
+      } else {
+        stream.onaddtrack = () => {
+          recorder.start(200);
+          stream.onaddtrack = () => {};
+        };
+      }
     };
   };
 
   read1();
   setTimeout(read2, 300);
-  setTimeout(read3, 200);
-
+  // read3(video1.captureStream());
+  video4.srcObject = delayStream(video1.captureStream(), 3);
   mediaSource1.addEventListener(
     "sourceended",
     function() {
