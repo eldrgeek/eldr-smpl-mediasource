@@ -3,20 +3,19 @@ import defer from "./defer";
 var video3;
 video3 = document.createElement("video");
 video3 = document.querySelector("#video3");
-video3.autoplay = video3.playsinline = true;
+video3.autoplay = video3.playsinline = video3.controls = true;
 
 export default function delayStream(stream, delay = 200, video = video3) {
   const mediaSource = new MediaSource();
-  let delayStream = (video3.src = window.URL.createObjectURL(mediaSource));
-
+  video3.src = window.URL.createObjectURL(mediaSource);
   const recorder = getMediaRecorder(stream);
-  delayStream = video3.src = window.URL.createObjectURL(mediaSource);
   mediaSource.onsourceopen = async function() {
     console.log("Added source buffer", mediaSource.sourceBuffers.length);
     let sourceBuffer3 = mediaSource.addSourceBuffer(
       // 'video/webm; codecs="vorbis,vp8"'
       "video/webm;codecs=vp9,opus"
     ); //
+
     // document.querySelector("#video3").src = delayStream
     let deferred = null;
     //called when the filereader has laoded
