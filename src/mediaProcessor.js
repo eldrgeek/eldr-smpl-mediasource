@@ -104,9 +104,9 @@ export default function main() {
               if (i === NUM_CHUNKS - 1) {
                 closeStream(sourceBuffer, mediaSource1);
               } else {
-                if (video1.paused) {
-                  video1.play(); // Start playing after 1st chunk is appended.
-                }
+                // if (video1.paused) {
+                //   video1.play(); // Start playing after 1st chunk is appended.
+                // }
                 readChunk_(++i);
               }
             };
@@ -179,9 +179,11 @@ export default function main() {
   };
 
   read1();
-  setTimeout(read2, 300);
+
+  setTimeout(read2, 500);
   // read3(video1.captureStream());
-  video4.srcObject = delayStream(video1.captureStream(), 3);
+  const stream = delayStream(video1.captureStream(), 3);
+  video4.srcObject = stream;
   mediaSource1.addEventListener(
     "sourceended",
     function() {

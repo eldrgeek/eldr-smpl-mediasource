@@ -1,10 +1,11 @@
 import React, { useEffect } from "react";
 import "./styles.css";
 import mediaProcessor from "./mediaProcessor";
+mediaProcessor();
 export default function App() {
-  useEffect(() => {
-    setTimeout(() => mediaProcessor(), 500);
-  }, []);
+  // useEffect(() => {
+  //   setTimeout(() => mediaProcessor(), 1000);
+  // }, []);
 
   return (
     <div className="App">

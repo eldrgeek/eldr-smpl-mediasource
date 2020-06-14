@@ -15,7 +15,6 @@ export default function delayStream(stream, delay = 200, video = video3) {
       // 'video/webm; codecs="vorbis,vp8"'
       "video/webm;codecs=vp9,opus"
     ); //
-
     // document.querySelector("#video3").src = delayStream
     let deferred = null;
     //called when the filereader has laoded
@@ -31,7 +30,12 @@ export default function delayStream(stream, delay = 200, video = video3) {
       // console.log("data", ++block);
       deferred = defer();
       let buffer = await e.data.arrayBuffer();
-      sourceBuffer3.appendBuffer(new Uint8Array(buffer));
+      try {
+        sourceBuffer3.appendBuffer(new Uint8Array(buffer));
+      } catch (e) {
+        debugger;
+        console.log("error ondatavailable ", e.toString());
+      }
       await deferred.promise;
       // if(block <= N_BLOCKS) recorder.resume()
     };
